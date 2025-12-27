@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mortgage Calculator</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root{
+  --bg:#f4f7fb;
+  --card:#ffffff;
+  --primary:#2563eb;
+  --success:#16a34a;
+  --text:#0f172a;
+  --border:#e5e7eb;
+  --radius:16px;
+  --shadow:0 20px 40px rgba(0,0,0,.08);
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Inter,system-ui,Arial;
+  background:var(--bg);
+  color:var(--text);
+}
+.container{
+  max-width:1200px;
+  margin:auto;
+  padding:20px;
+}
+h1{
+  text-align:center;
+  color:var(--primary);
+  margin-bottom:24px;
+}
+.grid{
+  display:grid;
+  grid-template-columns:1fr 1.2fr;
+  gap:24px;
+}
+@media(max-width:900px){
+  .grid{grid-template-columns:1fr}
+}
+.card{
+  background:var(--card);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:24px;
+}
+label{
+  font-size:14px;
+  margin-top:14px;
+  display:block;
+}
+input,select{
+  width:100%;
+  padding:12px;
+  margin-top:6px;
+  border:1px solid var(--border);
+  border-radius:10px;
+  font-size:15px;
+}
+button{
+  width:100%;
+  padding:14px;
+  margin-top:14px;
+  border:none;
+  border-radius:12px;
+  font-size:16px;
+  cursor:pointer;
+}
+.primary-btn{
+  background:var(--primary);
+  color:#fff;
+}
+.secondary-btn{
+  background:#eef2ff;
+  color:var(--primary);
+}
+.stats{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:14px;
+  margin-top:10px;
+}
+.stat{
+  background:#f8fafc;
+  padding:14px;
+  border-radius:12px;
+  text-align:center;
+}
+.stat h3{margin:0;font-size:20px;color:var(--primary)}
+.stat p{margin:4px 0 0;font-size:13px;color:#64748b}
+canvas{margin-top:20px}
+.hidden{display:none}
+table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+}
+th,td{
+  border:1px solid var(--border);
+  padding:8px;
+  text-align:right;
+}
+th{text-align:center;background:#f1f5f9}
+td:first-child,th:first-child{text-align:center}
+.toggle-btn{margin-top:20px}
+@media print{
+  body *{visibility:hidden}
+  #monthlyTableWrapper, #monthlyTableWrapper *{
+    visibility:visible
+  }
+  #monthlyTableWrapper{
+    position:absolute;
+    top:0;left:0;width:100%;
+  }
+  button{display:none}
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+<h1>Mortgage Calculator</h1>
+
+<div class="grid">
+
+<!-- INPUT -->
+<div class="card">
+<label>Home Price</label>
+<input id="loan" type="number" value="250000">
+
+<label>Annual Interest Rate (%)</label>
+<input id="rate" type="number" step="0.01" value="7.5">
+
+<label>Loan Term (Years)</label>
+<input id="years" type="number" value="20">
+
+<label>Currency</label>
+<select id="currency">
+  <option value="$">$ USD</option>
+  <option value="€">€ EUR</option>
+  <option value="£">£ GBP</option>
+  <option value="₹">₹ INR</option>
+</select>
+
+<button class="primary-btn" onclick="calculate()">Calculate Mortgage</button>
+<button class="secondary-btn" onclick="clearAll()">Clear</button>
+</div>
+
+<!-- OUTPUT -->
+<div class="card">
+<div class="stats">
+  <div class="stat">
+    <h3 id="emi">$0</h3>
+    <p>Monthly Payment</p>
+  </div>
+  <div class="stat">
+    <h3 id="totalPay">$0</h3>
+    <p>Total Payment</p>
+  </div>
+  <div class="stat">
+    <h3 id="interest">$0</h3>
+    <p>Total Interest</p>
+  </div>
+</div>
+
+<canvas id="balanceChart"></canvas>
+
+<button id="toggleBtn" class="secondary-btn toggle-btn">
+  Show Monthly Amortization Table
+</button>
+
+<div id="monthlyTableWrapper" class="hidden">
+<h3>Monthly Amortization Schedule</h3>
+<button class="secondary-btn" onclick="window.print()">Print Schedule</button>
+<table id="table">
+<thead>
+<tr>
+<th>Month</th>
+<th>Payment</th>
+<th>Principal</th>
+<th>Interest</th>
+<th>Balance</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
+</div>
+</div>
+</div>
+
+<script>
+let chart;
+
+function calculate(){
+  const loan=+loan.value;
+  const rate=+document.getElementById("rate").value/12/100;
+  const years=+document.getElementById("years").value;
+  const cur=document.getElementById("currency").value;
+  const months=years*12;
+
+  const emi=loan*rate*Math.pow(1+rate,months)/(Math.pow(1+rate,months)-1);
+  const total=emi*months;
+  const interest=total-loan;
+
+  document.getElementById("emi").innerText=cur+emi.toFixed(2);
+  document.getElementById("totalPay").innerText=cur+total.toFixed(2);
+  document.getElementById("interest").innerText=cur+interest.toFixed(2);
+
+  // Chart
+  let balance=loan;
+  let labels=[],data=[];
+  for(let i=1;i<=months;i++){
+    const int=balance*rate;
+    const prin=emi-int;
+    balance-=prin;
+    if(i%12===0){
+      labels.push("Year "+i/12);
+      data.push(balance.toFixed(0));
+    }
+  }
+
+  if(chart) chart.destroy();
+  chart=new Chart(balanceChart,{
+    type:"line",
+    data:{labels,datasets:[{label:"Remaining Balance",data,borderColor:"#2563eb",fill:false}]},
+    options:{responsive:true}
+  });
+
+  // Table
+  const tbody=document.querySelector("#table tbody");
+  tbody.innerHTML="";
+  balance=loan;
+  for(let i=1;i<=months;i++){
+    const int=balance*rate;
+    const prin=emi-int;
+    balance-=prin;
+    tbody.innerHTML+=`
+      <tr>
+        <td>${i}</td>
+        <td>${cur}${emi.toFixed(2)}</td>
+        <td>${cur}${prin.toFixed(2)}</td>
+        <td>${cur}${int.toFixed(2)}</td>
+        <td>${cur}${Math.max(balance,0).toFixed(2)}</td>
+      </tr>`;
+  }
+}
+
+toggleBtn.onclick=()=>{
+  monthlyTableWrapper.classList.toggle("hidden");
+  toggleBtn.textContent=monthlyTableWrapper.classList.contains("hidden")
+    ?"Show Monthly Amortization Table"
+    :"Hide Monthly Amortization Table";
+};
+
+function clearAll(){
+  document.getElementById("emi").innerText="$0";
+  document.getElementById("totalPay").innerText="$0";
+  document.getElementById("interest").innerText="$0";
+  if(chart) chart.destroy();
+  document.querySelector("#table tbody").innerHTML="";
+}
+</script>
+</body>
+</html>
